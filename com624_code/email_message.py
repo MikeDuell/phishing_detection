@@ -16,7 +16,7 @@ SCOPES = ['https://mail.google.com/']
 
 def gmail_authenticate():
     creds_info = dict(st.secrets["gmail_oauth"])
-    flow = InstalledAppFlow.from_client_config({"installed": creds_info}, SCOPES)
+    flow = InstalledAppFlow.from_client_config({"web": creds_info}, SCOPES)
 
     # Step 1: Generate the authorization URL
     auth_url, _ = flow.authorization_url(prompt='consent')
