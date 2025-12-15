@@ -1,109 +1,96 @@
-import os
-import pickle
-# Gmail API utils
+import streamlit as st
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-# for encoding/decoding messages in base64
-from base64 import urlsafe_b64decode, urlsafe_b64encode
+from google.oauth2.credentials import Credentials
+from base64 import urlsafe_b64decode
 
-# Request all access (permission to read/send/receive emails, manage the inbox, and more)
 SCOPES = ['https://mail.google.com/']
-our_email = 'your_gmail@gmail.com'
 
+
+
+import streamlit as st
+from googleapiclient.discovery import build
+from google_auth_oauthlib.flow import Flow
+from google.oauth2.credentials import Credentials
+
+SCOPES = ["https://mail.google.com/"]
 
 def gmail_authenticate():
-    creds = None
-    # the file token.pickle stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first time
-    if os.path.exists("token.pickle"):
-        with open("token.pickle", "rb") as token:
-            creds = pickle.load(token)
-    # if there are no (valid) credentials availablle, let the user log in.
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-        # save the credentials for the next run
-        with open("token.pickle", "wb") as token:
-            pickle.dump(creds, token)
-    return build('gmail', 'v1', credentials=creds)
+    creds_info = dict(st.secrets["gmail_oauth"])
+    redirect_uri = "https://phishingdetectiongit-2s7gc97yznq7p9335vr3vh.streamlit.app"
 
+    # Build a web-app flow and set the redirect explicitly
+    flow = Flow.from_client_config({"web": creds_info}, scopes=SCOPES)
+    flow.redirect_uri = redirect_uri
 
-# get the Gmail API service
-service = gmail_authenticate()
+    # If we're returning from Google, capture the "code" and exchange it
+    code = st.query_params.get("code")
+    if code:
+        try:
+            flow.fetch_token(code=code)
+            creds = flow.credentials
+            st.session_state["gmail_creds"] = creds
+            return build("gmail", "v1", credentials=creds)
+        except Exception as e:
+            st.error(f"Token exchange failed: {e}")
+            st.stop()
+
+    # Otherwise, start the flow
+    auth_url, _ = flow.authorization_url(
+      access_type="offline",
+      include_granted_scopes="true",
+      prompt="consent"
+    )
+    st.link_button("Authenticate with Google", auth_url)
+    st.stop()  # Wait for redirect back with ?code=...
+
+def fetch_messages():
+    service = gmail_authenticate()
+    profile = service.users().getProfile(userId="me").execute()
+    st.write("Authenticated email address:", profile["emailAddress"])
+    results = service.users().messages().list(userId="me", q="is:unread", maxResults=20).execute()
+    st.write(f"Found {len(results.get('messages', []))} results.")
+
 
 
 def search_messages(service):
     result = service.users().messages().list(userId='me', q="is:unread", maxResults=20).execute()
-    messages = []
-    if 'messages' in result:
-        messages.extend(result['messages'])
-    return messages
+    return result.get('messages', [])
 
 
 def read_message(service, message):
     msg = service.users().messages().get(userId='me', id=message['id'], format='full').execute()
-    #print(msg['payload']['parts'][1])
     payload = msg['payload']
-    headers = payload.get("headers")
-    parts = payload.get("parts")
+    headers = payload.get("headers", [])
+    parts = payload.get("parts", [])
     header_dict = {h['name']: h['value'] for h in headers}
-
-    # Parse body and attachments
-    body = parse_parts(service, parts, message)
-
+    body = parse_parts(parts)
     return {'headers': header_dict, 'body': body}
 
 
-def parse_parts(service, parts, message):
-    """
-    Utility function that parses the content of an email partition
-    """
+def parse_parts(parts):
     if parts:
         for part in parts:
             mimeType = part.get("mimeType")
-            body = part.get("body")
+            body = part.get("body", {})
             data = body.get("data")
-            part_headers = part.get("headers")
             if part.get("parts"):
-                # recursively call this function when we see that a part
-                # has parts inside
-                parse_parts(service, part.get("parts"), message)
-            if mimeType == "text/plain":
-                # if the email part is text plain
-                if data:
-                    text = urlsafe_b64decode(data).decode()
-
-                return text
-
-            else:
-                # attachment other than a plain text or HTML
-                for part_header in part_headers:
-                    part_header.get("name")
-                    part_header.get("value")
-
-
-def clean(text):
-    # clean text for creating a folder
-    return "".join(c if c.isalnum() else "_" for c in text)
+                return parse_parts(part.get("parts"))
+            if mimeType == "text/plain" and data:
+                return urlsafe_b64decode(data).decode()
+    return ""
 
 
 def fetch_messages():
     service = gmail_authenticate()
-    # Get the profile of the authenticated account
+    if not service:
+        return []
+
     profile = service.users().getProfile(userId='me').execute()
-    print("Authenticated email address:", profile['emailAddress'])
-    # get emails that match the query you specify
+    st.write("Authenticated email address:", profile['emailAddress'])
+
     results = search_messages(service)
-    print(f"Found {len(results)} results.")
+    st.write(f"Found {len(results)} results.")
 
-    messages_data = []
-
-    for msg in results:
-        info = read_message(service, msg)
-        messages_data.append(info)
-
+    messages_data = [read_message(service, msg) for msg in results]
     return messages_data
