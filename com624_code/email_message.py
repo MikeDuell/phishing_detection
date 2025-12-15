@@ -10,18 +10,11 @@ def gmail_authenticate():
     creds_info = dict(st.secrets["gmail_oauth"])
     flow = InstalledAppFlow.from_client_config({"installed": creds_info}, SCOPES)
 
-    # If credentials already exist in session state, reuse them
-    if "gmail_creds" in st.session_state:
-        return build('gmail', 'v1', credentials=st.session_state["gmail_creds"])
+    # This prints a link in the app/terminal instead of opening a local browser
+    creds = flow.run_console()
+    return build('gmail', 'v1', credentials=creds)
 
-    # Otherwise, let the user trigger authentication
-    if st.button("Authenticate with Gmail"):
-        creds = flow.run_console()   # works in deployed apps (no local server)
-        st.session_state["gmail_creds"] = creds
-        return build('gmail', 'v1', credentials=creds)
 
-    st.warning("Please authenticate with Gmail first.")
-    return None
 
 
 def search_messages(service):
