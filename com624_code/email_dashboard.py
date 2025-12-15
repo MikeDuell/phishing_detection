@@ -22,6 +22,29 @@ senders = []
 bodies = []
 df_email = None
 
+import streamlit as st
+from googleapiclient.discovery import build
+from google_auth_oauthlib.flow import InstalledAppFlow
+
+SCOPES = ['https://mail.google.com/']
+
+def gmail_authenticate():
+    creds_info = dict(st.secrets["gmail_oauth"])
+    flow = InstalledAppFlow.from_client_config({"installed": creds_info}, SCOPES)
+
+    # If already authenticated, reuse credentials
+    if "gmail_creds" in st.session_state:
+        return build('gmail', 'v1', credentials=st.session_state["gmail_creds"])
+
+    # Otherwise, prompt user
+    if st.button("Authenticate with Google"):
+        creds = flow.run_console()   # prints a link + asks for code
+        st.session_state["gmail_creds"] = creds
+        return build('gmail', 'v1', credentials=creds)
+
+    st.info("Click the button above to authenticate with Google.")
+    return None
+
 if "emails" not in st.session_state:
     st.session_state["emails"] = []
 
