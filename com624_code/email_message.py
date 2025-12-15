@@ -6,14 +6,33 @@ from base64 import urlsafe_b64decode
 
 SCOPES = ['https://mail.google.com/']
 
+import streamlit as st
+from googleapiclient.discovery import build
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.oauth2.credentials import Credentials
+from base64 import urlsafe_b64decode
+
+SCOPES = ['https://mail.google.com/']
+
 def gmail_authenticate():
     creds_info = dict(st.secrets["gmail_oauth"])
     flow = InstalledAppFlow.from_client_config({"installed": creds_info}, SCOPES)
 
-    # This prints a link in the app/terminal instead of opening a local browser
-    creds = flow.run_console()
-    return build('gmail', 'v1', credentials=creds)
+    # Step 1: Generate the authorization URL
+    auth_url, _ = flow.authorization_url(prompt='consent')
 
+    st.markdown(f"[Click here to authenticate with Google]({auth_url})")
+
+    # Step 2: User pastes the code back
+    auth_code = st.text_input("Paste the authorization code here:")
+
+    if auth_code:
+        flow.fetch_token(code=auth_code)
+        creds = flow.credentials
+        st.session_state["gmail_creds"] = creds
+        return build('gmail', 'v1', credentials=creds)
+
+    return None
 
 
 
