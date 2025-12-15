@@ -174,51 +174,52 @@ if len(st.session_state["training_data"] == 0):
     predictions = {}  # Store predictions
     trained_models = {}
     # Loop through each classical model
-    for name, model in models.items():
-        m = model.fit(X_train_scaled, y_train)  # Train model
+    if trained_models != {}:
+        for name, model in models.items():
+            m = model.fit(X_train_scaled, y_train)  # Train model
 
-        # After training your model
+            # After training your model
 
-        y_pred = model.predict(X_test_scaled)
+            y_pred = model.predict(X_test_scaled)
 
-        predictions[name] = y_pred
-        print(f"\n{name} Classification Report:\n")
-        print(classification_report(y_test, y_pred, zero_division=0))
+            predictions[name] = y_pred
+            print(f"\n{name} Classification Report:\n")
+            print(classification_report(y_test, y_pred, zero_division=0))
 
-        metrics = evaluate_model(y_test, y_pred)
-        trained_models[name] = m
-        if trained_models != {}:
-            st.info(f"{name} Model has been trained")
-        results[name] = metrics
-        st.write(metrics)
-
-
-        # --- Feature Importance Section ---
-        try:
-            # Case 1: Tree-based models (RandomForest, XGBoost, etc.)
-            if hasattr(m, "feature_importances_"):
-                importances = m.feature_importances_
-            # Case 2: Linear models (LogisticRegression, LinearSVC, etc.)
-            elif hasattr(m, "coef_"):
-                importances = abs(m.coef_[0])
-            # Case 3: Fallback to permutation importance
-            else:
-                perm = permutation_importance(m, X_test_scaled, y_test, n_repeats=10, random_state=42)
-                importances = perm.importances_mean
-
-            # Plot feature importance
-            fig, ax = plt.subplots()
-            ax.barh(range(len(importances)), importances)
-            ax.set_yticks(range(len(importances)))
-            ax.set_yticklabels(features_super_learning)  # replace with your feature list
-            ax.set_xlabel("Importance")
-            ax.set_title(f"{name} Feature Importance")
-            st.pyplot(fig)
+            metrics = evaluate_model(y_test, y_pred)
+            trained_models[name] = m
+            if trained_models != {}:
+                st.info(f"{name} Model has been trained")
+            results[name] = metrics
+            st.write(metrics)
 
 
+            # --- Feature Importance Section ---
+            try:
+                # Case 1: Tree-based models (RandomForest, XGBoost, etc.)
+                if hasattr(m, "feature_importances_"):
+                    importances = m.feature_importances_
+                # Case 2: Linear models (LogisticRegression, LinearSVC, etc.)
+                elif hasattr(m, "coef_"):
+                    importances = abs(m.coef_[0])
+                # Case 3: Fallback to permutation importance
+                else:
+                    perm = permutation_importance(m, X_test_scaled, y_test, n_repeats=10, random_state=42)
+                    importances = perm.importances_mean
 
-        except Exception as e:
-            st.warning(f"Feature importance not available for {name}: {e}")
+                # Plot feature importance
+                fig, ax = plt.subplots()
+                ax.barh(range(len(importances)), importances)
+                ax.set_yticks(range(len(importances)))
+                ax.set_yticklabels(features_super_learning)  # replace with your feature list
+                ax.set_xlabel("Importance")
+                ax.set_title(f"{name} Feature Importance")
+                st.pyplot(fig)
+
+
+
+            except Exception as e:
+                st.warning(f"Feature importance not available for {name}: {e}")
 
     if len(st.session_state["emails"]) > 0:
         chosen_recipe = st.selectbox("choose an algorithm:",
