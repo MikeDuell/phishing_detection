@@ -174,7 +174,7 @@ if len(st.session_state["training_data"] == 0):
     predictions = {}  # Store predictions
     trained_models = {}
     # Loop through each classical model
-    if trained_models != {}:
+    if trained_models == {}:
         for name, model in models.items():
             m = model.fit(X_train_scaled, y_train)  # Train model
 
