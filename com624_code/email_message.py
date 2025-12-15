@@ -12,7 +12,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.oauth2.credentials import Credentials
 from base64 import urlsafe_b64decode
 
-SCOPES = ['https://mail.google.com/']
+
 
 def gmail_authenticate():
     creds_info = dict(st.secrets["gmail_oauth"])
