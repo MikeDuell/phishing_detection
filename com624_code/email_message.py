@@ -1,98 +1,67 @@
-import os
-import pickle
-# Gmail API utils
+import streamlit as st
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-# for encoding/decoding messages in base64
-from base64 import urlsafe_b64decode, urlsafe_b64encode
+from google.oauth2.credentials import Credentials
+from base64 import urlsafe_b64decode
 
-# Request all access (permission to read/send/receive emails, manage the inbox, and more)
 SCOPES = ['https://mail.google.com/']
-our_email = 'your_gmail@gmail.com'
-
-
-
-
-
-# get the Gmail API service
-service = gmail_authenticate()
 
 def gmail_authenticate():
     creds_info = dict(st.secrets["gmail_oauth"])
     flow = InstalledAppFlow.from_client_config({"installed": creds_info}, SCOPES)
-    creds = flow.run_local_server(port=0)
-    return build('gmail', 'v1', credentials=creds)
+
+    # If credentials already exist in session state, reuse them
+    if "gmail_creds" in st.session_state:
+        return build('gmail', 'v1', credentials=st.session_state["gmail_creds"])
+
+    # Otherwise, let the user trigger authentication
+    if st.button("Authenticate with Gmail"):
+        creds = flow.run_console()   # works in deployed apps (no local server)
+        st.session_state["gmail_creds"] = creds
+        return build('gmail', 'v1', credentials=creds)
+
+    st.warning("Please authenticate with Gmail first.")
+    return None
 
 
 def search_messages(service):
     result = service.users().messages().list(userId='me', q="is:unread", maxResults=20).execute()
-    messages = []
-    if 'messages' in result:
-        messages.extend(result['messages'])
-    return messages
+    return result.get('messages', [])
 
 
 def read_message(service, message):
     msg = service.users().messages().get(userId='me', id=message['id'], format='full').execute()
-    #print(msg['payload']['parts'][1])
     payload = msg['payload']
-    headers = payload.get("headers")
-    parts = payload.get("parts")
+    headers = payload.get("headers", [])
+    parts = payload.get("parts", [])
     header_dict = {h['name']: h['value'] for h in headers}
-
-    # Parse body and attachments
-    body = parse_parts(service, parts, message)
-
+    body = parse_parts(parts)
     return {'headers': header_dict, 'body': body}
 
 
-def parse_parts(service, parts, message):
-    """
-    Utility function that parses the content of an email partition
-    """
+def parse_parts(parts):
     if parts:
         for part in parts:
             mimeType = part.get("mimeType")
-            body = part.get("body")
+            body = part.get("body", {})
             data = body.get("data")
-            part_headers = part.get("headers")
             if part.get("parts"):
-                # recursively call this function when we see that a part
-                # has parts inside
-                parse_parts(service, part.get("parts"), message)
-            if mimeType == "text/plain":
-                # if the email part is text plain
-                if data:
-                    text = urlsafe_b64decode(data).decode()
-
-                return text
-
-            else:
-                # attachment other than a plain text or HTML
-                for part_header in part_headers:
-                    part_header.get("name")
-                    part_header.get("value")
-
-
-def clean(text):
-    # clean text for creating a folder
-    return "".join(c if c.isalnum() else "_" for c in text)
+                return parse_parts(part.get("parts"))
+            if mimeType == "text/plain" and data:
+                return urlsafe_b64decode(data).decode()
+    return ""
 
 
 def fetch_messages():
     service = gmail_authenticate()
-    # Get the profile of the authenticated account
+    if not service:
+        return []
+
     profile = service.users().getProfile(userId='me').execute()
-    print("Authenticated email address:", profile['emailAddress'])
-    # get emails that match the query you specify
+    st.write("Authenticated email address:", profile['emailAddress'])
+
     results = search_messages(service)
-    print(f"Found {len(results)} results.")
+    st.write(f"Found {len(results)} results.")
 
-    messages_data = []
-
-    for msg in results:
-        info = read_message(service, msg)
-        messages_data.append(info)
-
+    messages_data = [read_message(service, msg) for msg in results]
     return messages_data
