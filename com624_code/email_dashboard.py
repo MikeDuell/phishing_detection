@@ -95,7 +95,7 @@ if "training_data" not in st.session_state:
 print(len(st.session_state["training_data"]))
 if st.button("Train Model"):
     if len(st.session_state["training_data"]) == 0:
-        st.session_state["training_data"] = pd.read_csv('data/feature_added_clean_data.csv',
+        st.session_state["training_data"] = pd.read_csv('../data/feature_added_clean_data.csv',
                                                         encoding='ISO-8859-1',
                                                         dtype={"label": "int8", "urls": "int8"},
                                                         na_values=['na', 'NA', 'Unknown', ''])
