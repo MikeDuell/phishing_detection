@@ -8,25 +8,48 @@ SCOPES = ['https://mail.google.com/']
 
 
 
+import streamlit as st
+from googleapiclient.discovery import build
+from google_auth_oauthlib.flow import Flow
+from google.oauth2.credentials import Credentials
+
+SCOPES = ["https://mail.google.com/"]
+
 def gmail_authenticate():
     creds_info = dict(st.secrets["gmail_oauth"])
-    flow = InstalledAppFlow.from_client_config({"web": creds_info}, SCOPES)
+    redirect_uri = "https://phishingdetectiongit-2s7gc97yznq7p9335vr3vh.streamlit.app"
 
-    # Step 1: Generate the authorization URL
-    auth_url, _ = flow.authorization_url(prompt='consent')
+    # Build a web-app flow and set the redirect explicitly
+    flow = Flow.from_client_config({"web": creds_info}, scopes=SCOPES)
+    flow.redirect_uri = redirect_uri
 
-    st.markdown(f"[Click here to authenticate with Google]({auth_url})")
+    # If we're returning from Google, capture the "code" and exchange it
+    code = st.query_params.get("code")
+    if code:
+        try:
+            flow.fetch_token(code=code)
+            creds = flow.credentials
+            st.session_state["gmail_creds"] = creds
+            return build("gmail", "v1", credentials=creds)
+        except Exception as e:
+            st.error(f"Token exchange failed: {e}")
+            st.stop()
 
-    # Step 2: User pastes the code back
-    auth_code = st.text_input("Paste the authorization code here:")
+    # Otherwise, start the flow
+    auth_url, _ = flow.authorization_url(
+      access_type="offline",
+      include_granted_scopes="true",
+      prompt="consent"
+    )
+    st.link_button("Authenticate with Google", auth_url)
+    st.stop()  # Wait for redirect back with ?code=...
 
-    if auth_code:
-        flow.fetch_token(code=auth_code)
-        creds = flow.credentials
-        st.session_state["gmail_creds"] = creds
-        return build('gmail', 'v1', credentials=creds)
-
-    return None
+def fetch_messages():
+    service = gmail_authenticate()
+    profile = service.users().getProfile(userId="me").execute()
+    st.write("Authenticated email address:", profile["emailAddress"])
+    results = service.users().messages().list(userId="me", q="is:unread", maxResults=20).execute()
+    st.write(f"Found {len(results.get('messages', []))} results.")
 
 
 
