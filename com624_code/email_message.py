@@ -6,12 +6,6 @@ from base64 import urlsafe_b64decode
 
 SCOPES = ['https://mail.google.com/']
 
-import streamlit as st
-from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.oauth2.credentials import Credentials
-from base64 import urlsafe_b64decode
-
 
 
 def gmail_authenticate():
