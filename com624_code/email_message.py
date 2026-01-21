@@ -2,6 +2,7 @@ import streamlit as st
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
+from base64 import urlsafe_b64decode
 
 SCOPES = ["https://mail.google.com/"]
 
