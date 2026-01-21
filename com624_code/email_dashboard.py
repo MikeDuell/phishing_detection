@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import GaussianNB
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
+from base64 import urlsafe_b64decode
 
 from cleaning import split_date, normalise_time, clean_text, mask_email_domain
 from email_message import fetch_messages
